@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "esaiph"
+version = "0.1.0"
+description = "Software Testing & Monitoring Tool — detailed process recording and analysis"
+requires-python = ">=3.10"
+dependencies = [
+    "psutil>=5.9.0",
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "customtkinter>=5.2.0",
+]
+
+[project.scripts]
+esaiph = "esaiph.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]

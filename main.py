@@ -1,12 +1,29 @@
-from resource_monitor import get_cpu_usage, get_memory_usage
-import time
+"""eSaiph — Software Testing & Monitoring Tool.
+
+Usage:
+    python main.py          → Launch the GUI
+    python main.py cli      → Launch the CLI
+    python main.py --help   → Show help
+
+Or install with: pip install -e .
+Then use: esaiph --help
+"""
+
+import sys
+
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "cli":
+        # Remove 'cli' from argv so Click doesn't see it as a command
+        sys.argv.pop(1)
+        from esaiph.cli import main as cli_main
+        cli_main()
+    elif len(sys.argv) > 1 and sys.argv[1] == "--help":
+        print(__doc__)
+    else:
+        from esaiph.gui.app import launch_gui
+        launch_gui()
+
 
 if __name__ == "__main__":
-
-    while True:
-        cpu_usage = get_cpu_usage(3434)
-        print(f"CPU usage for PID 3434: {cpu_usage}%")
-        mem_usage = get_memory_usage(3434)
-        print(f"Memory usage for PID 3434: {mem_usage} MB")
-        time.sleep(5)
-        
+    main()
