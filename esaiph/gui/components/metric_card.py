@@ -1,14 +1,20 @@
-"""MetricCard — A styled card widget displaying a single metric with label, value, and optional bar."""
+"""MetricCard — Clean stat card matching the dashboard reference."""
 
 from __future__ import annotations
 
 import customtkinter as ctk
 
+from ..theme import (
+    BG_CARD, BG_ELEVATED, BORDER, BORDER_HOVER,
+    TEXT_MAIN, TEXT_MUTED, TEXT_DIM,
+    FONT_BODY, RADIUS_LG,
+)
+
 
 class MetricCard(ctk.CTkFrame):
-    """Displays a labeled metric with a value and optional progress bar.
+    """Compact stat card: small label on top, large bold value below.
 
-    Used in the recording dashboard to show CPU, memory, I/O, etc.
+    Matches the dashboard reference's hero stat cards.
     """
 
     def __init__(
@@ -17,82 +23,80 @@ class MetricCard(ctk.CTkFrame):
         label: str = "Metric",
         value: str = "—",
         unit: str = "",
+        accent_color: str = "#e040fb",
         show_bar: bool = False,
         bar_value: float = 0.0,
-        color: str = "#00d4aa",
         **kwargs,
     ):
+        # Remove unsupported kwargs
+        kwargs.pop("show_sparkline", None)
+        kwargs.pop("accent_color", None)
+
         super().__init__(
             master,
-            corner_radius=12,
-            fg_color=("#f0f0f0", "#1a1a2e"),
+            corner_radius=RADIUS_LG,
+            fg_color=BG_CARD,
             border_width=1,
-            border_color=("#e0e0e0", "#2a2a3e"),
+            border_color=BORDER,
             **kwargs,
         )
 
-        self._color = color
-
-        # Layout
+        self._unit = unit
+        self._accent = accent_color
         self.grid_columnconfigure(0, weight=1)
 
-        # Label
-        self._label = ctk.CTkLabel(
-            self,
+        # Accent dot + label row
+        label_row = ctk.CTkFrame(self, fg_color="transparent")
+        label_row.grid(row=0, column=0, padx=18, pady=(14, 0), sticky="w")
+
+        ctk.CTkFrame(
+            label_row, width=6, height=6,
+            corner_radius=3, fg_color=accent_color,
+        ).pack(side="left", padx=(0, 6))
+
+        ctk.CTkLabel(
+            label_row,
             text=label.upper(),
-            font=ctk.CTkFont(size=11, weight="bold"),
-            text_color=("#888888", "#888888"),
-            anchor="w",
-        )
-        self._label.grid(row=0, column=0, padx=16, pady=(12, 2), sticky="w")
+            font=ctk.CTkFont(family=FONT_BODY, size=10, weight="bold"),
+            text_color=TEXT_DIM,
+        ).pack(side="left")
 
         # Value
         self._value_label = ctk.CTkLabel(
             self,
-            text=f"{value} {unit}".strip(),
-            font=ctk.CTkFont(size=24, weight="bold"),
-            text_color=color,
+            text=self._format(value),
+            font=ctk.CTkFont(family=FONT_BODY, size=26, weight="bold"),
+            text_color=TEXT_MAIN,
             anchor="w",
         )
-        self._value_label.grid(row=1, column=0, padx=16, pady=(0, 4), sticky="w")
+        self._value_label.grid(row=1, column=0, padx=18, pady=(2, 4), sticky="w")
 
         # Optional progress bar
         self._bar = None
         if show_bar:
             self._bar = ctk.CTkProgressBar(
-                self,
-                height=6,
-                corner_radius=3,
-                progress_color=color,
-                fg_color=("#e0e0e0", "#2a2a3e"),
+                self, height=3, corner_radius=2,
+                progress_color=accent_color, fg_color=BORDER,
             )
-            self._bar.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="ew")
+            self._bar.grid(row=2, column=0, padx=18, pady=(0, 14), sticky="ew")
             self._bar.set(bar_value / 100.0 if bar_value <= 100 else 1.0)
         else:
-            self._value_label.grid_configure(pady=(0, 12))
+            self._value_label.grid_configure(pady=(2, 14))
 
-        self._unit = unit
+        # Hover
+        self.bind("<Enter>", lambda e: self.configure(fg_color=BG_ELEVATED, border_color=BORDER_HOVER))
+        self.bind("<Leave>", lambda e: self.configure(fg_color=BG_CARD, border_color=BORDER))
+
+    def _format(self, value: str) -> str:
+        return f"{value} {self._unit}".strip() if self._unit else value
 
     def update_value(self, value: str, bar_value: float | None = None):
-        """Update the displayed value and optionally the bar."""
-        display = f"{value} {self._unit}".strip()
-        self._value_label.configure(text=display)
-
+        self._value_label.configure(text=self._format(value))
         if self._bar is not None and bar_value is not None:
-            normalized = max(0.0, min(1.0, bar_value / 100.0))
-            self._bar.set(normalized)
-
-            # Dynamic color based on value
-            if bar_value > 80:
-                self._bar.configure(progress_color="#ff4757")
-            elif bar_value > 50:
-                self._bar.configure(progress_color="#ffa502")
+            self._bar.set(max(0.0, min(1.0, bar_value / 100.0)))
+            if bar_value > 85:
+                self._bar.configure(progress_color="#ff4060")
+            elif bar_value > 60:
+                self._bar.configure(progress_color="#ffb347")
             else:
-                self._bar.configure(progress_color=self._color)
-
-    def update_color(self, color: str):
-        """Change the accent color."""
-        self._color = color
-        self._value_label.configure(text_color=color)
-        if self._bar:
-            self._bar.configure(progress_color=color)
+                self._bar.configure(progress_color=self._accent)

@@ -1,4 +1,4 @@
-"""LogsView — Browse, inspect, and export recorded session logs."""
+"""LogsView — Cosmic-styled session log browser."""
 
 from __future__ import annotations
 
@@ -7,181 +7,205 @@ from typing import Optional
 import customtkinter as ctk
 
 from ..components.session_card import SessionCard
+from ..theme import (
+    BG_BASE, BG_CARD, BG_INPUT,
+    BORDER, BORDER_LIGHT,
+    TEXT_MAIN, TEXT_MUTED, TEXT_DIM,
+    PINK, PINK_HOVER, PURPLE, SUCCESS, ERROR,
+    FONT_BODY, FONT_HEADING,
+    RADIUS_SM, RADIUS_LG,
+)
 from ...core.analyzer import analyze_session, format_summary_text
 from ...core.recorder import list_sessions, load_session_snapshots, delete_session
 
 
 class LogsView(ctk.CTkFrame):
-    """Session log browser with list of sessions and detail panel."""
+    """Session log browser — list + detail split view."""
 
     def __init__(self, master, **kwargs):
-        super().__init__(master, fg_color="transparent", **kwargs)
+        super().__init__(master, fg_color=BG_BASE, corner_radius=0, **kwargs)
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        self._build_toolbar()
+        self._build_header()
         self._build_content()
         self._refresh_sessions()
 
-    def _build_toolbar(self):
-        """Build the top toolbar with refresh and export buttons."""
-        toolbar = ctk.CTkFrame(self, fg_color=("#f0f0f0", "#1a1a2e"), corner_radius=12)
-        toolbar.grid(row=0, column=0, padx=16, pady=(16, 8), sticky="ew")
-        toolbar.grid_columnconfigure(0, weight=1)
+    def _build_header(self):
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=0, column=0, padx=28, pady=(24, 0), sticky="ew")
+        header.grid_columnconfigure(0, weight=1)
+
+        title_row = ctk.CTkFrame(header, fg_color="transparent")
+        title_row.grid(row=0, column=0, sticky="ew")
+        title_row.grid_columnconfigure(0, weight=1)
+
+        # Thin + bold title
+        t_frame = ctk.CTkFrame(title_row, fg_color="transparent")
+        t_frame.grid(row=0, column=0, sticky="w")
 
         ctk.CTkLabel(
-            toolbar,
-            text="📋 Session Logs",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            anchor="w",
-        ).grid(row=0, column=0, padx=16, pady=12, sticky="w")
+            t_frame, text="Session ",
+            font=ctk.CTkFont(family=FONT_HEADING, size=24),
+            text_color=TEXT_MAIN, anchor="w",
+        ).grid(row=0, column=0, sticky="w")
 
-        refresh_btn = ctk.CTkButton(
-            toolbar,
-            text="🔄 Refresh",
-            font=ctk.CTkFont(size=12),
-            fg_color=("#ddd", "#2a2a3e"),
-            hover_color=("#ccc", "#3a3a4e"),
-            text_color=("#333", "#e0e0e0"),
-            height=32,
-            corner_radius=8,
-            width=90,
+        ctk.CTkLabel(
+            t_frame, text="Logs",
+            font=ctk.CTkFont(family=FONT_HEADING, size=24, weight="bold"),
+            text_color=TEXT_MAIN, anchor="w",
+        ).grid(row=0, column=1, sticky="w")
+
+        ctk.CTkButton(
+            title_row, text="↻  Refresh",
+            font=ctk.CTkFont(family=FONT_BODY, size=11, weight="bold"),
+            fg_color=BG_CARD, hover_color=BG_INPUT,
+            text_color=TEXT_MUTED,
+            border_width=1, border_color=BORDER,
+            height=30, corner_radius=RADIUS_SM, width=90,
             command=self._refresh_sessions,
-        )
-        refresh_btn.grid(row=0, column=1, padx=(4, 16), pady=12)
+        ).grid(row=0, column=1, sticky="e")
+
+        ctk.CTkLabel(
+            header,
+            text="Browse and analyze recorded monitoring sessions.",
+            font=ctk.CTkFont(family=FONT_BODY, size=12),
+            text_color=TEXT_MUTED, anchor="w",
+        ).grid(row=1, column=0, pady=(2, 0), sticky="w")
 
     def _build_content(self):
-        """Build the split content area: session list + detail panel."""
         content = ctk.CTkFrame(self, fg_color="transparent")
-        content.grid(row=1, column=0, padx=16, pady=(0, 16), sticky="nsew")
+        content.grid(row=1, column=0, padx=28, pady=(16, 20), sticky="nsew")
         content.grid_columnconfigure(0, weight=2)
         content.grid_columnconfigure(1, weight=3)
         content.grid_rowconfigure(0, weight=1)
 
-        # Left: scrollable session list
-        self._list_frame = ctk.CTkScrollableFrame(
-            content,
-            fg_color=("#f8f8f8", "#141425"),
-            corner_radius=12,
-            label_text="Sessions",
-            label_font=ctk.CTkFont(size=12, weight="bold"),
+        # Session list card
+        list_card = ctk.CTkFrame(
+            content, fg_color=BG_CARD,
+            corner_radius=RADIUS_LG, border_width=1, border_color=BORDER,
         )
-        self._list_frame.grid(row=0, column=0, padx=(0, 8), sticky="nsew")
+        list_card.grid(row=0, column=0, padx=(0, 6), sticky="nsew")
+        list_card.grid_columnconfigure(0, weight=1)
+        list_card.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            list_card, text="SESSIONS",
+            font=ctk.CTkFont(family=FONT_BODY, size=9, weight="bold"),
+            text_color=TEXT_DIM, anchor="w",
+        ).grid(row=0, column=0, padx=18, pady=(14, 6), sticky="w")
+
+        self._list_frame = ctk.CTkScrollableFrame(
+            list_card, fg_color="transparent",
+            scrollbar_button_color=BORDER,
+            scrollbar_button_hover_color=BORDER_LIGHT,
+        )
+        self._list_frame.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="nsew")
         self._list_frame.grid_columnconfigure(0, weight=1)
 
-        # Right: detail panel
-        self._detail_frame = ctk.CTkFrame(
-            content,
-            fg_color=("#f8f8f8", "#141425"),
-            corner_radius=12,
+        # Detail card
+        detail_card = ctk.CTkFrame(
+            content, fg_color=BG_CARD,
+            corner_radius=RADIUS_LG, border_width=1, border_color=BORDER,
         )
-        self._detail_frame.grid(row=0, column=1, padx=(8, 0), sticky="nsew")
-        self._detail_frame.grid_columnconfigure(0, weight=1)
-        self._detail_frame.grid_rowconfigure(1, weight=1)
+        detail_card.grid(row=0, column=1, padx=(6, 0), sticky="nsew")
+        detail_card.grid_columnconfigure(0, weight=1)
+        detail_card.grid_rowconfigure(1, weight=1)
 
-        # Detail header
         self._detail_header = ctk.CTkLabel(
-            self._detail_frame,
-            text="Select a session to view details",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=("#888", "#888"),
-            anchor="w",
+            detail_card, text="Select a session",
+            font=ctk.CTkFont(family=FONT_BODY, size=13, weight="bold"),
+            text_color=TEXT_DIM, anchor="w",
         )
-        self._detail_header.grid(row=0, column=0, padx=16, pady=(16, 8), sticky="ew")
+        self._detail_header.grid(row=0, column=0, padx=18, pady=(14, 6), sticky="ew")
 
-        # Detail text
         self._detail_text = ctk.CTkTextbox(
-            self._detail_frame,
-            font=ctk.CTkFont(family="Consolas", size=12),
-            fg_color=("#ffffff", "#0d0d1a"),
-            text_color=("#333333", "#d0d0d0"),
-            corner_radius=8,
-            wrap="none",
+            detail_card,
+            font=ctk.CTkFont(family="Consolas", size=11),
+            fg_color=BG_INPUT, text_color=TEXT_MUTED,
+            corner_radius=RADIUS_SM,
+            border_width=1, border_color=BORDER,
+            wrap="none", activate_scrollbars=True,
+            scrollbar_button_color=BORDER,
         )
-        self._detail_text.grid(row=1, column=0, padx=12, pady=(0, 8), sticky="nsew")
+        self._detail_text.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="nsew")
 
-        # Detail actions
-        actions = ctk.CTkFrame(self._detail_frame, fg_color="transparent")
-        actions.grid(row=2, column=0, padx=12, pady=(0, 12), sticky="ew")
+        # Actions
+        actions = ctk.CTkFrame(detail_card, fg_color="transparent")
+        actions.grid(row=2, column=0, padx=10, pady=(0, 12), sticky="ew")
         actions.grid_columnconfigure(2, weight=1)
 
         self._export_json_btn = ctk.CTkButton(
-            actions, text="Export JSON", height=30, width=100, corner_radius=6,
-            fg_color="#6c5ce7", hover_color="#5a4bd1",
-            font=ctk.CTkFont(size=11),
-            command=lambda: self._export_selected("json"),
-            state="disabled",
+            actions, text="Export JSON", height=28, width=100,
+            corner_radius=RADIUS_SM,
+            fg_color=PINK, hover_color=PINK_HOVER, text_color="#ffffff",
+            font=ctk.CTkFont(family=FONT_BODY, size=10, weight="bold"),
+            command=lambda: self._export_selected("json"), state="disabled",
         )
         self._export_json_btn.grid(row=0, column=0, padx=(0, 4))
 
         self._export_csv_btn = ctk.CTkButton(
-            actions, text="Export CSV", height=30, width=100, corner_radius=6,
-            fg_color="#00b894", hover_color="#00a381",
-            font=ctk.CTkFont(size=11),
-            command=lambda: self._export_selected("csv"),
-            state="disabled",
+            actions, text="Export CSV", height=28, width=100,
+            corner_radius=RADIUS_SM,
+            fg_color=BG_INPUT, hover_color=BG_BASE,
+            text_color=TEXT_MUTED, border_width=1, border_color=BORDER,
+            font=ctk.CTkFont(family=FONT_BODY, size=10, weight="bold"),
+            command=lambda: self._export_selected("csv"), state="disabled",
         )
         self._export_csv_btn.grid(row=0, column=1, padx=4)
 
         self._delete_btn = ctk.CTkButton(
-            actions, text="🗑 Delete", height=30, width=90, corner_radius=6,
-            fg_color="#ff4757", hover_color="#ff3344",
-            font=ctk.CTkFont(size=11),
-            command=self._delete_selected,
-            state="disabled",
+            actions, text="Delete", height=28, width=70,
+            corner_radius=RADIUS_SM,
+            fg_color=BG_INPUT, hover_color=("#fde8e8", "#2a1020"),
+            text_color=ERROR, border_width=1, border_color=BORDER,
+            font=ctk.CTkFont(family=FONT_BODY, size=10, weight="bold"),
+            command=self._delete_selected, state="disabled",
         )
         self._delete_btn.grid(row=0, column=3, padx=(4, 0))
 
         self._selected_session_id: Optional[str] = None
 
     def _refresh_sessions(self):
-        """Reload and display all sessions."""
-        # Clear existing cards
-        for widget in self._list_frame.winfo_children():
-            widget.destroy()
+        for w in self._list_frame.winfo_children():
+            w.destroy()
 
         sessions = list_sessions()
-
         if not sessions:
             ctk.CTkLabel(
                 self._list_frame,
-                text="No sessions yet.\nStart recording with the Record tab.",
-                font=ctk.CTkFont(size=13),
-                text_color=("#888", "#888"),
-                justify="center",
+                text="No sessions yet.\nRecord one first.",
+                font=ctk.CTkFont(family=FONT_BODY, size=12),
+                text_color=TEXT_DIM, justify="center",
             ).grid(row=0, column=0, pady=40)
             return
 
-        for i, session in enumerate(sessions):
-            card = SessionCard(
+        for i, s in enumerate(sessions):
+            SessionCard(
                 self._list_frame,
-                session_id=session.session_id,
-                process_name=session.process_name,
-                pid=session.pid,
-                start_time=session.start_time,
-                duration=session.duration_seconds,
-                samples=session.total_samples,
-                exit_reason=session.exit_reason,
+                session_id=s.session_id,
+                process_name=s.process_name,
+                pid=s.pid,
+                start_time=s.start_time,
+                duration=s.duration_seconds,
+                samples=s.total_samples,
+                exit_reason=s.exit_reason,
                 on_click=self._show_session_detail,
-            )
-            card.grid(row=i, column=0, padx=4, pady=4, sticky="ew")
+            ).grid(row=i, column=0, padx=4, pady=3, sticky="ew")
 
     def _show_session_detail(self, session_id: str):
-        """Load and display the detailed report for a session."""
         self._selected_session_id = session_id
-
         sessions = list_sessions()
         session = next((s for s in sessions if s.session_id == session_id), None)
         if not session:
             return
 
         self._detail_header.configure(
-            text=f"{session.process_name} (PID {session.pid}) — {session.session_id}",
-            text_color=("#222", "#e0e0e0"),
+            text=f"{session.process_name} (PID {session.pid})  ·  {session.session_id}",
+            text_color=TEXT_MAIN,
         )
 
-        # Load and analyze
         try:
             snapshots = load_session_snapshots(session_id)
             summary = analyze_session(session, snapshots)
@@ -189,60 +213,47 @@ class LogsView(ctk.CTkFrame):
         except FileNotFoundError:
             report = "Session log file not found."
         except Exception as e:
-            report = f"Error loading session: {e}"
+            report = f"Error: {e}"
 
         self._detail_text.configure(state="normal")
         self._detail_text.delete("1.0", "end")
         self._detail_text.insert("1.0", report)
         self._detail_text.configure(state="disabled")
 
-        # Enable buttons
-        self._export_json_btn.configure(state="normal")
-        self._export_csv_btn.configure(state="normal")
-        self._delete_btn.configure(state="normal")
+        for btn in (self._export_json_btn, self._export_csv_btn, self._delete_btn):
+            btn.configure(state="normal")
 
     def _export_selected(self, fmt: str):
-        """Export the selected session via file dialog."""
         if not self._selected_session_id:
             return
-
         from tkinter import filedialog
-        ext = fmt
-        filepath = filedialog.asksaveasfilename(
-            defaultextension=f".{ext}",
-            filetypes=[(f"{fmt.upper()} files", f"*.{ext}")],
-            initialfile=f"{self._selected_session_id}.{ext}",
+        fp = filedialog.asksaveasfilename(
+            defaultextension=f".{fmt}",
+            filetypes=[(f"{fmt.upper()}", f"*.{fmt}")],
+            initialfile=f"{self._selected_session_id}.{fmt}",
         )
-        if not filepath:
+        if not fp:
             return
-
-        import subprocess
-        import sys
+        import subprocess, sys
         subprocess.Popen(
             [sys.executable, "-m", "esaiph.cli", "logs", "export",
-             self._selected_session_id, "-f", fmt, "-o", filepath],
-            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
+             self._selected_session_id, "-f", fmt, "-o", fp],
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
 
     def _delete_selected(self):
-        """Delete the selected session."""
         if not self._selected_session_id:
             return
-
-        # Confirm
-        dialog = ctk.CTkInputDialog(
-            text=f"Type 'delete' to confirm deletion of session {self._selected_session_id}:",
-            title="Confirm Delete",
+        d = ctk.CTkInputDialog(
+            text=f"Type 'delete' to confirm:", title="Confirm Delete",
         )
-        result = dialog.get_input()
-        if result and result.strip().lower() == "delete":
+        if (d.get_input() or "").strip().lower() == "delete":
             delete_session(self._selected_session_id)
             self._selected_session_id = None
-            self._detail_header.configure(text="Session deleted.", text_color="#ff4757")
+            self._detail_header.configure(text="Deleted.", text_color=ERROR)
             self._detail_text.configure(state="normal")
             self._detail_text.delete("1.0", "end")
             self._detail_text.configure(state="disabled")
-            self._export_json_btn.configure(state="disabled")
-            self._export_csv_btn.configure(state="disabled")
-            self._delete_btn.configure(state="disabled")
+            for btn in (self._export_json_btn, self._export_csv_btn, self._delete_btn):
+                btn.configure(state="disabled")
             self._refresh_sessions()
