@@ -1,0 +1,21 @@
+services:
+  lgtm:
+    image: grafana/otel-lgtm:latest
+    container_name: telemetry-lgtm
+    ports:
+      # Grafana UI
+      - "3000:3000"
+
+      # OpenTelemetry Receiver Ports
+      - "4317:4317" # gRPC
+      - "4318:4318" # HTTP
+
+      - "3100:3100" # Loki
+      - "3200:3200" # Tempo
+      - "9009:9009" # Mimir
+
+    environment:
+      - ENABLE_EXEMPLARS=true
+
+    volumes:
+      - ./lgtm-data:/data
